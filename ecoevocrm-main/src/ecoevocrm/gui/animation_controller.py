@@ -65,6 +65,14 @@ class AnimationController:
         self.buffer_critical = buffer_critical  # Critical threshold
         self.buffer_low = buffer_low            # Low threshold
 
+        #------------------------------
+        # Visualization window control
+        #------------------------------
+        self.viz_window_duration = 100.0  # Default: show 100 time units
+        self.viz_window_start = 0.0
+        self.viz_window_end = 100.0
+        self.snap_to_live = True  # Pin to leading edge by default
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def add_data_chunk(self, t_epoch, biomass_epoch):
@@ -328,6 +336,91 @@ class AnimationController:
             speed (float): Speed multiplier (0.1 = 10x slower, 10 = 10x faster)
         """
         self.animation_speed = max(0.1, min(speed, 10.0))  # Clamp to reasonable range
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def zoom_in(self, factor=0.5):
+        """
+        Zoom in (shorten time window).
+
+        Args:
+            factor (float): Factor to multiply duration by (default 0.5 = half duration)
+        """
+        new_duration = self.viz_window_duration * factor
+        self.viz_window_duration = max(new_duration, 10.0)  # Min 10 time units
+        self._update_viz_window()
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def zoom_out(self, factor=2.0):
+        """
+        Zoom out (lengthen time window).
+
+        Args:
+            factor (float): Factor to multiply duration by (default 2.0 = double duration)
+        """
+        new_duration = self.viz_window_duration * factor
+        # Don't zoom out beyond available data
+        max_duration = max(self.integration_time, 100.0)
+        self.viz_window_duration = min(new_duration, max_duration)
+        self._update_viz_window()
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def scrub_forward(self, amount=10.0):
+        """
+        Move viz window forward in time.
+
+        Args:
+            amount (float): Time units to move forward
+        """
+        self.snap_to_live = False  # Drop pin when scrubbing
+        self.viz_window_start += amount
+        self.viz_window_end += amount
+        self._clamp_viz_window()
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def scrub_backward(self, amount=10.0):
+        """
+        Move viz window backward in time.
+
+        Args:
+            amount (float): Time units to move backward
+        """
+        self.snap_to_live = False  # Drop pin when scrubbing
+        self.viz_window_start = max(0.0, self.viz_window_start - amount)
+        self.viz_window_end = self.viz_window_start + self.viz_window_duration
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def snap_to_live_edge(self):
+        """Pin viz window to leading edge of animation stream."""
+        self.snap_to_live = True
+        self._update_viz_window()
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def _update_viz_window(self):
+        """Update viz window based on current state."""
+        if self.snap_to_live:
+            # Pin to leading edge
+            self.viz_window_end = max(self.animation_time, self.viz_window_duration)
+            self.viz_window_start = max(0.0, self.viz_window_end - self.viz_window_duration)
+        else:
+            # Keep current position
+            self.viz_window_end = self.viz_window_start + self.viz_window_duration
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def _clamp_viz_window(self):
+        """Ensure viz window is within valid range."""
+        self.viz_window_start = max(0.0, self.viz_window_start)
+        max_end = max(self.integration_time, self.viz_window_duration)
+        self.viz_window_end = min(self.viz_window_end, max_end)
+        # Ensure window doesn't collapse
+        if self.viz_window_end - self.viz_window_start < 10.0:
+            self.viz_window_end = self.viz_window_start + 10.0
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

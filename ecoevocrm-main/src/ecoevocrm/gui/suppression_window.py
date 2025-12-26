@@ -173,6 +173,44 @@ class SuppressionWindow(QMainWindow):
         speed_hint.setStyleSheet("QLabel { color: #666; }")
         left_layout.addWidget(speed_hint)
 
+        #------------------------------
+        # Visualization window controls
+        #------------------------------
+        viz_label = QLabel("View Controls")
+        viz_label.setAlignment(Qt.AlignCenter)
+        viz_label.setFont(QFont("Arial", 9, QFont.Bold))
+        left_layout.addWidget(viz_label)
+
+        # Zoom controls
+        zoom_layout = QHBoxLayout()
+        self.zoom_in_button = QPushButton("🔍+ Zoom In")
+        self.zoom_out_button = QPushButton("🔍- Zoom Out")
+        self.zoom_in_button.clicked.connect(lambda: self.animation_controller.zoom_in())
+        self.zoom_out_button.clicked.connect(lambda: self.animation_controller.zoom_out())
+        self.zoom_in_button.setEnabled(False)
+        self.zoom_out_button.setEnabled(False)
+        zoom_layout.addWidget(self.zoom_in_button)
+        zoom_layout.addWidget(self.zoom_out_button)
+        left_layout.addLayout(zoom_layout)
+
+        # Scrub controls
+        scrub_layout = QHBoxLayout()
+        self.scrub_back_button = QPushButton("◀ Back")
+        self.scrub_forward_button = QPushButton("Forward ▶")
+        self.scrub_back_button.clicked.connect(lambda: self.animation_controller.scrub_backward(10.0))
+        self.scrub_forward_button.clicked.connect(lambda: self.animation_controller.scrub_forward(10.0))
+        self.scrub_back_button.setEnabled(False)
+        self.scrub_forward_button.setEnabled(False)
+        scrub_layout.addWidget(self.scrub_back_button)
+        scrub_layout.addWidget(self.scrub_forward_button)
+        left_layout.addLayout(scrub_layout)
+
+        # Snap to live button
+        self.snap_live_button = QPushButton("📍 Snap to Live")
+        self.snap_live_button.clicked.connect(lambda: self.animation_controller.snap_to_live_edge())
+        self.snap_live_button.setEnabled(False)
+        left_layout.addWidget(self.snap_live_button)
+
         left_layout.addWidget(self.status_label)
         left_layout.addStretch()
 
@@ -285,6 +323,11 @@ class SuppressionWindow(QMainWindow):
         self.stop_button.setEnabled(True)
         self.play_pause_button.setEnabled(True)
         self.speed_slider.setEnabled(True)
+        self.zoom_in_button.setEnabled(True)
+        self.zoom_out_button.setEnabled(True)
+        self.scrub_back_button.setEnabled(True)
+        self.scrub_forward_button.setEnabled(True)
+        self.snap_live_button.setEnabled(True)
 
         # Disable parameter inputs during simulation
         self.cost_baseline_input.setEnabled(False)
@@ -313,6 +356,11 @@ class SuppressionWindow(QMainWindow):
         self.stop_button.setEnabled(False)
         self.play_pause_button.setEnabled(False)
         self.speed_slider.setEnabled(False)
+        self.zoom_in_button.setEnabled(False)
+        self.zoom_out_button.setEnabled(False)
+        self.scrub_back_button.setEnabled(False)
+        self.scrub_forward_button.setEnabled(False)
+        self.snap_live_button.setEnabled(False)
 
         # Re-enable parameter inputs after stop
         self.cost_baseline_input.setEnabled(True)
