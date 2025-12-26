@@ -6,7 +6,8 @@
 
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                              QPushButton, QLabel, QMessageBox, QSlider,
-                             QGroupBox, QFormLayout, QDoubleSpinBox, QFrame)
+                             QGroupBox, QFormLayout, QDoubleSpinBox, QFrame,
+                             QCheckBox)
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QFont
 import time
