@@ -82,15 +82,31 @@ class SuppressionWindow(QMainWindow):
         self.play_pause_button.setEnabled(False)
         self.play_pause_button.setMinimumHeight(35)
 
-        self.speed_label = QLabel("Speed: 1.0x")
+        self.speed_label = QLabel("Speed: Manual (1.0×)")
         self.speed_label.setAlignment(Qt.AlignCenter)
         self.speed_label.setFont(QFont("Arial", 10))
 
         self.speed_slider = QSlider(Qt.Horizontal)
-        self.speed_slider.setRange(-40, 40)  # Log scale centered at 0
+        # Expanded range: -60 to +80 for 0.25x to 100x
+        # -60 → 10^(-1.5) ≈ 0.316 → clamp to 0.25
+        # 0 → 10^0 = 1.0
+        # +80 → 10^2 = 100.0
+        self.speed_slider.setRange(-60, 80)
         self.speed_slider.setValue(0)  # 1.0x default
         self.speed_slider.valueChanged.connect(self.on_speed_changed)
         self.speed_slider.setEnabled(False)
+
+        #------------------------------
+        # Auto speed mode toggle
+        #------------------------------
+        self.auto_speed_checkbox = QCheckBox("Auto Speed")
+        self.auto_speed_checkbox.setChecked(False)  # Start in manual mode
+        self.auto_speed_checkbox.stateChanged.connect(self.on_auto_speed_toggled)
+        self.auto_speed_checkbox.setEnabled(False)  # Enable when simulation starts
+        self.auto_speed_checkbox.setToolTip(
+            "Enable automatic timescale-aware playback speed.\n"
+            "Speed adapts based on simulation time and data density."
+        )
 
         #------------------------------
         # Create status label (three timescales)
@@ -322,7 +338,9 @@ class SuppressionWindow(QMainWindow):
         self.run_button.setEnabled(False)
         self.stop_button.setEnabled(True)
         self.play_pause_button.setEnabled(True)
-        self.speed_slider.setEnabled(True)
+        # Enable slider only if auto mode is not active
+        self.speed_slider.setEnabled(not self.auto_speed_checkbox.isChecked())
+        self.auto_speed_checkbox.setEnabled(True)  # Enable auto toggle
         self.zoom_in_button.setEnabled(True)
         self.zoom_out_button.setEnabled(True)
         self.scrub_back_button.setEnabled(True)
@@ -488,6 +506,22 @@ class SuppressionWindow(QMainWindow):
             self.multi_type_plot.update_from_controller(self.animation_controller)
 
         #------------------------------
+        # Throttle speed label updates to ~5-10 Hz (not every frame)
+        #------------------------------
+        if not hasattr(self, '_label_update_counter'):
+            self._label_update_counter = 0
+
+        self._label_update_counter += 1
+
+        # Update label every 6 frames (~10 Hz at 60 FPS)
+        if self._label_update_counter >= 6:
+            self._label_update_counter = 0
+
+            if self.auto_speed_checkbox.isChecked():
+                current_speed = self.animation_controller.get_current_effective_speed()
+                self.speed_label.setText(f"Speed: Auto ({current_speed:.2f}×)")
+
+        #------------------------------
         # Update status display
         #------------------------------
         self.update_status_label()
@@ -511,15 +545,50 @@ class SuppressionWindow(QMainWindow):
         """
         Update animation speed based on slider.
 
+        Only applies when in manual mode (auto unchecked).
+
         Args:
-            value (int): Slider value (-40 to +40)
+            value (int): Slider value (-60 to +80)
         """
         # Convert slider value to speed multiplier (logarithmic scale)
-        # value=-40 -> 0.1x, value=0 -> 1x, value=40 -> 10x
+        # Expanded range: 0.25x to 100x
         speed = 10 ** (value / 40.0)
+        speed = max(0.25, min(speed, 100.0))
 
-        self.animation_controller.set_speed(speed)
-        self.speed_label.setText(f"Speed: {speed:.2f}x")
+        # Update controller (only affects manual mode)
+        self.animation_controller.set_manual_speed(speed)
+
+        # Update label only if in manual mode
+        if not self.auto_speed_checkbox.isChecked():
+            self.speed_label.setText(f"Speed: Manual ({speed:.2f}×)")
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def on_auto_speed_toggled(self, state):
+        """
+        Handle auto speed checkbox state change.
+
+        Args:
+            state (int): Qt.Checked or Qt.Unchecked
+        """
+        from PyQt5.QtCore import Qt
+
+        if state == Qt.Checked:
+            # Enable auto mode
+            self.animation_controller.enable_auto_speed()
+            self.speed_slider.setEnabled(False)  # Disable slider in auto mode
+
+            # Update label to show auto mode
+            auto_speed = self.animation_controller.get_current_effective_speed()
+            self.speed_label.setText(f"Speed: Auto ({auto_speed:.2f}×)")
+        else:
+            # Disable auto mode (manual)
+            self.animation_controller.disable_auto_speed()
+            self.speed_slider.setEnabled(True)  # Enable slider in manual mode
+
+            # Update label to show manual mode
+            manual_speed = self.animation_controller.get_current_effective_speed()
+            self.speed_label.setText(f"Speed: Manual ({manual_speed:.2f}×)")
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

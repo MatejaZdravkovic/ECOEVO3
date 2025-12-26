@@ -73,6 +73,25 @@ class AnimationController:
         self.viz_window_end = 100.0
         self.snap_to_live = True  # Pin to leading edge by default
 
+        #------------------------------
+        # Auto speed mode
+        #------------------------------
+        self.auto_speed_enabled = False       # Auto mode toggle
+        self.manual_speed = default_speed     # Speed when in manual mode
+        self.computed_auto_speed = 1.0        # Computed speed in auto mode (raw)
+        self.smoothed_auto_speed = 1.0        # EMA-smoothed auto speed (used for playback)
+
+        #------------------------------
+        # Timescale tracking for auto mode
+        #------------------------------
+        self.recent_dt_samples = []           # Track recent dt values
+        self.max_dt_samples = 20              # Keep last 20 chunks
+
+        #------------------------------
+        # EMA smoothing for auto speed
+        #------------------------------
+        self.auto_speed_ema_alpha = 0.1       # EMA smoothing factor (0.1 = smooth, 0.9 = responsive)
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def add_data_chunk(self, t_epoch, biomass_epoch):
@@ -131,6 +150,11 @@ class AnimationController:
         if len(self.buffer_times) > 0:
             self.integration_time = self.buffer_times[-1]
 
+        #------------------------------
+        # Track dt samples for auto speed computation
+        #------------------------------
+        self._track_dt_sample(t_epoch)
+
         # DIAGNOSTIC LOGGING
         print(f"[AnimCtrl] add_data_chunk: buffer now has {len(self.buffer_times)} points, "
               f"integration_time={self.integration_time:.2e}", flush=True)
@@ -167,11 +191,23 @@ class AnimationController:
         # Calculate how much to advance animation time
         #------------------------------
         # real_time_delta: actual elapsed time (e.g., 0.016 seconds for 60 FPS)
-        # animation_speed: user control (0.1x to 10x)
+        # effective_speed: auto or manual speed
         # get_speed_factor(): automatic slowdown if buffer is low
 
+        # Determine effective animation speed
+        if self.auto_speed_enabled:
+            # Auto mode: compute speed dynamically (returns smoothed value)
+            effective_speed = self.compute_auto_speed()
+        else:
+            # Manual mode: use slider-controlled speed
+            effective_speed = self.manual_speed
+
+        # Update animation_speed for backwards compatibility
+        self.animation_speed = effective_speed
+
+        # Apply buffer-based speed adjustment on top
         speed_factor = self.get_speed_factor()
-        delta_anim_time = real_time_delta * self.animation_speed * speed_factor
+        delta_anim_time = real_time_delta * effective_speed * speed_factor
 
         # Advance animation time
         self.animation_time += delta_anim_time
@@ -283,6 +319,186 @@ class AnimationController:
         else:
             # Healthy buffer - full speed
             return 1.0
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def _track_dt_sample(self, t_epoch):
+        """
+        Extract and track dt sample from time array.
+
+        Args:
+            t_epoch: Time array (scalar, list, or ndarray)
+        """
+        # Convert to array if needed
+        if isinstance(t_epoch, (int, float)):
+            return  # Single point, no dt to extract
+
+        t_array = np.asarray(t_epoch)
+        if len(t_array) > 1:
+            dts = np.diff(t_array)
+            median_dt = float(np.median(dts))
+            self.recent_dt_samples.append(median_dt)
+            # Keep only recent samples
+            if len(self.recent_dt_samples) > self.max_dt_samples:
+                self.recent_dt_samples.pop(0)
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def estimate_current_dt(self):
+        """
+        Estimate typical dt from recent data chunks.
+
+        Returns:
+            float: Estimated dt (time spacing) in simulation time units
+        """
+        if len(self.buffer_times) < 2:
+            return 1.0  # Default fallback
+
+        # Use recent dt samples if available
+        if len(self.recent_dt_samples) > 0:
+            return np.median(self.recent_dt_samples)
+
+        # Fallback: estimate from buffer tail
+        if len(self.buffer_times) >= 10:
+            recent_times = self.buffer_times[-10:]
+            dts = np.diff(recent_times)
+            return float(np.median(dts))
+
+        return 1.0
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def compute_auto_speed(self):
+        """
+        Compute optimal playback speed based on simulation timescale.
+
+        Algorithm:
+        - Early simulation (t < 100): slower playback (0.5x - 2x) for detailed observation
+        - Mid simulation (100 < t < 10000): moderate speed (2x - 10x)
+        - Late simulation (t > 10000): fast playback (10x - 100x) to avoid long wait
+        - Adjust based on dt: larger dt → faster playback
+        - Maintain ~30-60 FPS rendering rate
+
+        Returns:
+            float: Computed speed multiplier (0.25 to 100.0)
+        """
+        if len(self.buffer_times) == 0:
+            return 1.0
+
+        #------------------------------
+        # Get current timescale context
+        #------------------------------
+        t_current = self.animation_time
+        dt_estimate = self.estimate_current_dt()
+        buffer_gap = self.integration_time - self.animation_time
+        buffer_size = len(self.buffer_times)
+
+        #------------------------------
+        # Base speed from simulation time magnitude
+        #------------------------------
+        # Goal: keep "wall time per sim time unit" roughly constant
+        # As sim time grows, speed up to maintain viewer engagement
+
+        if t_current < 100:
+            # Early phase: slow playback for detail observation
+            base_speed = 1.0
+        elif t_current < 1000:
+            # Mid-early: moderate speedup
+            base_speed = 2.0
+        elif t_current < 10000:
+            # Mid: faster playback
+            base_speed = 5.0
+        elif t_current < 100000:
+            # Mid-late: much faster
+            base_speed = 10.0
+        else:
+            # Late phase: very fast to avoid endless waiting
+            base_speed = 20.0
+
+        #------------------------------
+        # Adjust for data density (dt)
+        #------------------------------
+        # Larger dt → fewer points per sim time → can go faster
+        # Smaller dt → denser data → slow down to appreciate detail
+
+        if dt_estimate > 100:
+            dt_factor = 2.0   # Sparse data, speed up
+        elif dt_estimate > 10:
+            dt_factor = 1.5
+        elif dt_estimate > 1:
+            dt_factor = 1.0
+        elif dt_estimate > 0.1:
+            dt_factor = 0.75
+        else:
+            dt_factor = 0.5   # Very dense data, slow down
+
+        #------------------------------
+        # Combine factors
+        #------------------------------
+        computed_speed = base_speed * dt_factor
+
+        #------------------------------
+        # Clamp to valid range
+        #------------------------------
+        computed_speed = max(0.25, min(computed_speed, 100.0))
+
+        #------------------------------
+        # Apply EMA smoothing to prevent jitter
+        #------------------------------
+        # Exponential moving average: smoothed = alpha * new + (1 - alpha) * old
+        self.smoothed_auto_speed = (
+            self.auto_speed_ema_alpha * computed_speed +
+            (1.0 - self.auto_speed_ema_alpha) * self.smoothed_auto_speed
+        )
+
+        return self.smoothed_auto_speed
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def enable_auto_speed(self):
+        """Enable automatic timescale-aware speed control."""
+        self.auto_speed_enabled = True
+        # Initialize smoothed auto speed to current value (prevents jump)
+        self.smoothed_auto_speed = self.manual_speed
+        # Compute initial auto speed
+        computed = self.compute_auto_speed()
+        # Update animation_speed for backwards compatibility
+        self.animation_speed = computed
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def disable_auto_speed(self):
+        """Disable auto speed, use manual slider control."""
+        self.auto_speed_enabled = False
+        # Update animation_speed for backwards compatibility
+        self.animation_speed = self.manual_speed
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def set_manual_speed(self, speed):
+        """
+        Set manual speed (used when auto mode is disabled).
+
+        Args:
+            speed (float): Speed multiplier (0.25 to 100.0)
+        """
+        self.manual_speed = max(0.25, min(speed, 100.0))
+        # Update legacy animation_speed for compatibility
+        self.animation_speed = self.manual_speed
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_current_effective_speed(self):
+        """
+        Get the current effective speed being used.
+
+        Returns:
+            float: Effective speed (smoothed auto or manual)
+        """
+        if self.auto_speed_enabled:
+            return self.smoothed_auto_speed
+        else:
+            return self.manual_speed
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -554,6 +770,11 @@ class AnimationController:
         #------------------------------
         if len(self.buffer_times) > 0:
             self.integration_time = self.buffer_times[-1]
+
+        #------------------------------
+        # Track dt samples for auto speed computation
+        #------------------------------
+        self._track_dt_sample(t_epoch)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
