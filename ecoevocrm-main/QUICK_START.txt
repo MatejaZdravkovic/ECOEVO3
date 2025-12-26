@@ -1,0 +1,118 @@
+========================================
+  EcoEvoCRM GUI - Quick Start Guide
+========================================
+
+INSTALLATION COMPLETE!
+All tests passed successfully.
+
+========================================
+HOW TO LAUNCH THE GUI
+========================================
+
+Option 1 (Windows - easiest):
+  Double-click: launch_gui.bat
+
+Option 2 (Python):
+  python launch_gui.py
+
+Option 3 (Module):
+  python -m ecoevocrm.app
+
+========================================
+QUICK TEST (Fast Results)
+========================================
+
+Once the GUI opens:
+
+1. Change these parameters in the left panel:
+   - T: 1000
+   - dt: 10
+   (keep all other defaults)
+
+2. Click "Run Simulation"
+
+3. Watch the biomass plot update in real-time!
+
+4. Should complete in a few seconds
+
+========================================
+REALISTIC SIMULATION
+========================================
+
+For a full evolutionary dynamics simulation:
+
+1. Use the default parameters:
+   - T: 1e6
+   - dt: 1e3
+   - mutation_rate: 1e-9
+   - num_types: 1
+   - num_resources: 10
+
+2. Click "Run Simulation"
+
+3. Watch as:
+   - Biomass evolves over time
+   - Status updates show current time
+   - Integration epochs stream data
+   - Mutation events trigger updates
+
+4. Will take several minutes to complete
+
+========================================
+WHAT YOU'LL SEE
+========================================
+
+LEFT PANEL:
+  - 10 parameter input boxes
+  - Run Simulation button (green when clicked)
+  - Stop button (to abort early)
+  - Status label (shows current time)
+
+RIGHT PANEL:
+  - Real-time biomass plot
+  - X-axis: Time
+  - Y-axis: Total Biomass
+  - Blue line updates as simulation runs
+
+========================================
+FEATURES
+========================================
+
+✓ Real-time visualization
+✓ Responsive UI (doesn't freeze)
+✓ Smooth plot updates
+✓ Status monitoring
+✓ Error handling
+✓ Stop/restart capability
+
+========================================
+TROUBLESHOOTING
+========================================
+
+If GUI doesn't start:
+  1. Run: python test_gui.py
+  2. Check all tests pass
+  3. Verify PyQt5 installed: pip list | findstr PyQt5
+
+If simulation doesn't run:
+  1. Check parameter values are positive
+  2. Try the Quick Test settings first
+  3. Check status label for errors
+
+If plot doesn't update:
+  1. Check T and dt values (dt should be << T)
+  2. Status label shows "Running"
+  3. Wait - large T values take time
+
+========================================
+NEXT STEPS
+========================================
+
+Now you can:
+  1. Launch the GUI
+  2. Run quick test
+  3. Experiment with parameters
+  4. Watch evolution in real-time!
+
+Enjoy your real-time evolutionary simulator!
+========================================

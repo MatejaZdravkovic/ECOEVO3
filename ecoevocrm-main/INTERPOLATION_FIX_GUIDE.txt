@@ -1,0 +1,452 @@
+================================================================================
+ECOEVOCRM SUPPRESSION MODEL GUI - INTERPOLATION BUG FIX GUIDE
+================================================================================
+
+This guide provides step-by-step instructions for setting up, testing, and
+running the suppression model desktop GUI after applying interpolation bug fixes.
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+
+1. Prerequisites
+2. Installation & Setup
+3. Verifying Installation
+4. Running Unit Tests
+5. Running the GUI (Quick Test Mode)
+6. Running the GUI (Full Simulation)
+7. Debug Logging
+8. Troubleshooting Common Issues
+9. Files Modified/Created
+10. What Was Fixed
+
+================================================================================
+1. PREREQUISITES
+================================================================================
+
+Required Software:
+- Python 3.7 or higher (Python 3.9 or 3.10 recommended)
+- Windows 10/11 (tested on Windows)
+- Command Prompt or PowerShell
+
+Required Packages:
+- numpy
+- scipy
+- matplotlib
+- PyQt5
+
+================================================================================
+2. INSTALLATION & SETUP
+================================================================================
+
+Step 1: Open Command Prompt
+----------------------------
+Press Win+R, type "cmd", press Enter
+
+Step 2: Navigate to Project Directory
+--------------------------------------
+cd C:\Users\Djordje\Desktop\ECOEVO3\ecoevocrm-main
+
+Step 3: Create Virtual Environment (if not exists)
+---------------------------------------------------
+python -m venv venv
+
+If you get an error about venv not being found:
+- Use "python3" instead of "python"
+- Or install: python -m pip install --user virtualenv
+
+Step 4: Activate Virtual Environment
+-------------------------------------
+For Command Prompt:
+    venv\Scripts\activate.bat
+
+For PowerShell:
+    venv\Scripts\Activate.ps1
+
+    If you get "execution policy" error in PowerShell:
+    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+You should see "(venv)" appear in your prompt.
+
+Step 5: Upgrade pip
+--------------------
+python -m pip install --upgrade pip
+
+Step 6: Install Required Packages
+----------------------------------
+pip install numpy scipy matplotlib PyQt5
+
+Step 7: Install Project in Development Mode
+--------------------------------------------
+pip install -e .
+
+This installs the ecoevocrm package from the current directory in "editable" mode,
+allowing you to make changes without reinstalling.
+
+================================================================================
+3. VERIFYING INSTALLATION
+================================================================================
+
+Test 1: Check Python Version
+-----------------------------
+python --version
+
+Expected: Python 3.7.x or higher
+
+Test 2: Verify Package Installation
+------------------------------------
+pip list | findstr /I "numpy scipy matplotlib PyQt5"
+
+Expected output:
+numpy          1.xx.x
+scipy          1.xx.x
+matplotlib     3.xx.x
+PyQt5          5.xx.x
+
+Test 3: Test Import
+-------------------
+python -c "import ecoevocrm; print('Import successful!')"
+
+Expected: "Import successful!" (no errors)
+
+If you see "ModuleNotFoundError: No module named 'ecoevocrm'":
+- Ensure you're in the correct directory (ecoevocrm-main)
+- Ensure virtual environment is activated (you see "(venv)")
+- Re-run: pip install -e .
+
+Test 4: Test GUI Imports
+-------------------------
+python -c "from ecoevocrm.gui.suppression_window import SuppressionWindow; print('GUI imports OK')"
+
+Expected: "GUI imports OK"
+
+================================================================================
+4. RUNNING UNIT TESTS
+================================================================================
+
+The test suite validates all interpolation edge cases.
+
+Run Tests:
+----------
+python tests\test_interpolation.py
+
+Expected Output:
+----------------
+============================================================
+INTERPOLATION UTILITY TEST SUITE
+============================================================
+
+=== TEST: Length Mismatch ===
+✓ PASSED
+
+=== TEST: Empty Arrays ===
+✓ PASSED
+
+... (11 tests total) ...
+
+============================================================
+RESULTS: 11 passed, 0 failed
+============================================================
+
+If tests fail:
+- Check that numpy and scipy are installed correctly
+- Ensure you're using the correct Python version
+- See section 8 (Troubleshooting)
+
+================================================================================
+5. RUNNING THE GUI (QUICK TEST MODE)
+================================================================================
+
+Quick test mode runs a shortened simulation (T=1e4 instead of T=1e6) for
+rapid validation. This completes in 10-30 seconds vs 30 minutes.
+
+Step 1: Enable Quick Test Mode
+-------------------------------
+Open: src\ecoevocrm\gui\suppression_window.py
+Find line ~203 (in on_run_clicked method):
+    params = get_suppression_params()
+Change to:
+    params = get_suppression_params(quick_test=True)
+
+Step 2: Run the Application
+----------------------------
+python run_suppression_app.py
+
+Step 3: Expected Behavior
+--------------------------
+- GUI window opens (~1400x900 pixels)
+- Left panel: Control buttons and status
+- Right panel: Two plots (multi-type abundance top, total biomass bottom)
+- Click "Run Suppression Model Simulation"
+- Simulation runs for 10-30 seconds
+- Plots update in real-time
+- Status shows: Animation time, Integration time, Buffer status
+- Green buffer status = healthy
+
+Step 4: Verify No Errors
+-------------------------
+Check the console output for any errors:
+- ✓ Good: "[suppression_config] Quick test mode: T=1e4, dt=100"
+- ✓ Good: "[SimulationWorker] Created influx interpolator..."
+- ✗ Bad: "ValueError: x and y arrays must be equal in length..."
+- ✗ Bad: "IndexError: ..."
+
+Step 5: Test Playback Controls
+-------------------------------
+While simulation is running:
+- Click "Pause" → animation should pause
+- Click "Play" → animation should resume
+- Move speed slider → playback speed changes (0.1x to 10x)
+
+Step 6: Clean Exit
+-------------------
+After simulation completes:
+- You should see "Simulation Complete" dialog
+- Click "Stop" to reset
+- Close window or click "Run" again for another test
+
+================================================================================
+6. RUNNING THE GUI (FULL SIMULATION)
+================================================================================
+
+For the full T=1e6 simulation (30 minutes):
+
+Step 1: Disable Quick Test Mode
+--------------------------------
+Open: src\ecoevocrm\gui\suppression_window.py
+Find line ~203:
+    params = get_suppression_params(quick_test=True)
+Change back to:
+    params = get_suppression_params()
+
+Step 2: Run
+-----------
+python run_suppression_app.py
+
+Step 3: Expected Duration
+--------------------------
+Full simulation takes ~30 minutes depending on hardware.
+You can monitor progress via the "Integration" time in the status bar.
+
+================================================================================
+7. DEBUG LOGGING
+================================================================================
+
+To enable detailed interpolation debug logging:
+
+Step 1: Enable Debug Flag
+--------------------------
+Open: src\ecoevocrm\gui\interpolation_utils.py
+Find line 13:
+    DEBUG_INTERPOLATION = False
+Change to:
+    DEBUG_INTERPOLATION = True
+
+Step 2: Run Application
+------------------------
+python run_suppression_app.py
+
+Step 3: Check Console Output
+-----------------------------
+You should see detailed logging like:
+[suppression_config] Influx arrays validated: times=10000, values.shape=(10000, 16)
+[SimulationWorker] Created influx interpolator: times=[0.00e+00, 1.00e+04]
+[INTERP:biomass_interp] SUCCESS - x_len=50 -> 50, y_len=50 -> 50
+
+This shows:
+- Array lengths before/after alignment
+- What actions were taken (truncated, sorted, deduped)
+- Whether validation succeeded
+
+Step 4: Disable Debug Logging
+------------------------------
+After debugging, set DEBUG_INTERPOLATION back to False to reduce console spam.
+
+================================================================================
+8. TROUBLESHOOTING COMMON ISSUES
+================================================================================
+
+Issue: "ModuleNotFoundError: No module named 'ecoevocrm'"
+----------------------------------------------------------
+Solution:
+1. Ensure virtual environment is activated: venv\Scripts\activate.bat
+2. Install in development mode: pip install -e .
+3. Verify: pip show ecoevocrm
+
+Issue: "ImportError: No module named 'PyQt5'"
+----------------------------------------------
+Solution:
+pip install PyQt5
+
+Issue: "ValueError: x and y arrays must be equal in length..."
+---------------------------------------------------------------
+This error should now be fixed! If you still see it:
+1. Verify all 5 files were modified correctly (see section 9)
+2. Enable debug logging (section 7)
+3. Run unit tests: python tests\test_interpolation.py
+4. Check console for which interpolation point is failing
+
+Issue: GUI window doesn't open
+-------------------------------
+Solution:
+1. Check PyQt5 is installed: pip show PyQt5
+2. Try running: python -c "from PyQt5.QtWidgets import QApplication; print('PyQt5 OK')"
+3. If error, reinstall: pip uninstall PyQt5 && pip install PyQt5
+
+Issue: Simulation hangs or freezes
+-----------------------------------
+Solution:
+1. Check Task Manager - is Python using 100% CPU? (normal during simulation)
+2. Wait at least 1 minute for quick test mode
+3. Check console for error messages
+4. Try enabling debug logging to see progress
+
+Issue: Plots don't update
+--------------------------
+Solution:
+1. Check status bar - is "Integration" time advancing?
+2. If yes but plots don't update, check console for matplotlib errors
+3. Try clicking "Pause" then "Play" to restart animation timer
+
+Issue: "TypeError: 'NoneType' object is not subscriptable"
+-----------------------------------------------------------
+This suggests interpolator creation failed. Solution:
+1. Enable debug logging
+2. Look for "[SimulationWorker] Failed to create influx interpolator"
+3. Check that influx_times and influx_values have correct shapes
+
+================================================================================
+9. FILES MODIFIED/CREATED
+================================================================================
+
+New Files Created:
+------------------
+1. src\ecoevocrm\gui\interpolation_utils.py (~300 lines)
+   - Core defensive logic for safe interpolation
+   - align_xy_for_interp() function
+   - safe_interp1d() wrapper
+   - DEBUG_INTERPOLATION flag
+
+2. tests\test_interpolation.py (~250 lines)
+   - Comprehensive test suite (11 tests)
+   - Tests all edge cases
+
+3. INTERPOLATION_FIX_GUIDE.txt (this file)
+   - Setup and troubleshooting guide
+
+Files Modified:
+---------------
+1. src\ecoevocrm\gui\simulation_worker.py
+   - Lines 72-123: Added influx interpolator validation
+   - Checks array shapes before creating scipy.interpolate.interp1d
+   - Informative error messages
+
+2. src\ecoevocrm\suppression_config.py
+   - Line 9: Added "import logging"
+   - Line 14: Added "quick_test" parameter
+   - Lines 70-77: Quick test mode (T=1e4, dt=100)
+   - Lines 103-128: Influx output validation
+
+3. src\ecoevocrm\gui\animation_controller.py
+   - Line 11-12: Added imports for logging and interpolation_utils
+   - Lines 91-102: Validation in add_data_chunk()
+   - Lines 327-391: Validation in add_multi_type_data_chunk() with bounds checking
+   - Lines 192-235: Validation in _interpolate_biomass()
+   - Lines 439-489: Validation in _interpolate_multi_type_abundance()
+
+4. src\ecoevocrm\gui\multi_type_plot_widget.py
+   - Line 9: Added "import logging"
+   - Lines 161-179: Validation before line.set_data()
+
+================================================================================
+10. WHAT WAS FIXED
+================================================================================
+
+Root Cause:
+-----------
+The error "x and y arrays must be equal in length along interpolation axis"
+occurred when scipy.interpolate.interp1d or matplotlib line.set_data() received
+arrays with mismatched lengths.
+
+This happened because:
+1. Simulation data chunks arrive asynchronously
+2. Array dimensions can change when mutations occur (new types appear)
+3. Time arrays and data arrays weren't always validated before use
+4. No defensive programming around array indexing
+
+Specific Bugs Fixed:
+--------------------
+1. simulation_worker.py:72-79 (BLOCKING)
+   - influx_times and influx_values shapes not validated
+   - Could crash immediately on simulation start
+
+2. animation_controller.py:336
+   - Array indexing N_epoch[type_idx, i] without bounds check
+   - Index 'i' could exceed array dimensions
+
+3. animation_controller.py:327-337
+   - No validation that len(t_list) == N_epoch.shape[1]
+   - Caused IndexError during data buffering
+
+4. animation_controller.py:82-100
+   - add_data_chunk() didn't verify array lengths matched
+   - Could corrupt buffer with mismatched data
+
+5. suppression_config.py:87-89
+   - Brownian motion output not validated before use
+   - Could create mismatched influx arrays
+
+6. multi_type_plot_widget.py:162-165
+   - line.set_data() called without array length validation
+   - Caused matplotlib plotting errors
+
+Solution Strategy:
+------------------
+1. Created interpolation_utils.py with align_xy_for_interp()
+   - Handles all edge cases: length mismatch, empty, NaN, duplicates, sorting
+   - Defensive programming with informative status reporting
+
+2. Applied validation at EVERY interpolation point
+   - Before creating interpolators
+   - Before array indexing
+   - Before plotting
+
+3. Added bounds checking for array access
+   - Explicit checks: if i < array.shape[1]
+   - Try-except blocks with informative errors
+
+4. Added debug logging infrastructure
+   - Toggle with DEBUG_INTERPOLATION flag
+   - See exactly what's happening during interpolation
+
+5. Added quick-test mode
+   - Rapid validation (10 seconds vs 30 minutes)
+   - Essential for iterative debugging
+
+Result:
+-------
+The application now robustly handles:
+- Streaming data chunks with varying sizes
+- Mutations causing dimension changes
+- Sparse or duplicate time points
+- Non-monotonic data arrival
+- Empty buffers and edge cases
+
+The GUI should run smoothly without interpolation errors!
+
+================================================================================
+SUPPORT
+================================================================================
+
+If you encounter issues not covered in this guide:
+1. Enable debug logging (section 7)
+2. Run unit tests: python tests\test_interpolation.py
+3. Check console output for specific error messages
+4. Verify all files were modified correctly (section 9)
+
+For questions about the simulation model itself, refer to:
+src\ecoevocrm\notebooks\2025-10-06_explore-group-suppression.ipynb
+
+================================================================================
+END OF GUIDE
+================================================================================

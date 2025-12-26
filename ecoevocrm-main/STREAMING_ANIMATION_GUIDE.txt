@@ -1,0 +1,307 @@
+========================================
+  EcoEvoCRM Streaming Animation Guide
+========================================
+
+OVERVIEW
+========================================
+
+The EcoEvoCRM GUI now features a sophisticated real-time
+streaming animation system that provides smooth, continuous
+visualization of evolutionary dynamics.
+
+KEY FEATURES:
+- Smooth 60 FPS animation
+- Play/pause controls
+- Variable playback speed (0.1x to 10x)
+- Zoom in/out controls
+- Automatic buffer management
+- Three time scale management
+
+========================================
+HOW TO LAUNCH
+========================================
+
+Option 1 - Batch File (Easiest):
+  Double-click: "EcoEvoCRM Simulator.bat"
+
+Option 2 - Desktop Shortcut:
+  1. Run: python create_desktop_shortcut.py
+  2. Double-click the desktop icon
+
+Option 3 - Python:
+  python launch_gui.py
+
+========================================
+THREE TIME SCALES
+========================================
+
+The animation system manages three different time scales:
+
+1. INTEGRATION TIME (Backend)
+   - How far the simulation has computed
+   - Shows as: "Integration: t=X.XXe+XX"
+   - This is the computational time
+
+2. ANIMATION TIME (Visualization)
+   - Current playback position in the animation
+   - Shows as: "Animation: t=X.XXe+XX"
+   - This is your current viewing position
+
+3. SIMULATION TIME (Plot Scale)
+   - The time scale shown on the plot
+   - Can be huge (e.g., T=1e6)
+   - Independent of real wall-clock time
+
+========================================
+PLAYBACK CONTROLS
+========================================
+
+PLAY/PAUSE BUTTON:
+  - Click to pause the animation
+  - Click again to resume
+  - Integration continues in background
+  - Useful for examining specific moments
+
+SPEED SLIDER:
+  - Adjust animation playback speed
+  - Range: 0.1x (10x slower) to 10x (10x faster)
+  - Uses logarithmic scale for smooth control
+  - Shows current speed: "Speed: X.Xx"
+
+========================================
+ZOOM CONTROLS
+========================================
+
+ZOOM IN:
+  - Reduces time window (shows more detail)
+  - Each click shows half the time range
+  - Follows animation position
+
+ZOOM OUT:
+  - Increases time window (shows more history)
+  - Each click doubles the time range
+  - Auto-resets to "Fit All" when fully zoomed out
+
+FIT ALL:
+  - Shows complete simulation history
+  - Displays all data from t=0 to current time
+  - Default view when simulation starts
+
+========================================
+BUFFER STATUS
+========================================
+
+The status bar shows buffer health:
+
+Buffer: XXX (healthy)
+  - Green light: Plenty of data ahead
+  - Animation runs at full speed
+
+Buffer: XXX (low)
+  - Yellow light: Buffer running low
+  - Animation automatically slows down
+  - Prevents stuttering
+
+Buffer: XXX (critical)
+  - Red light: Very low buffer
+  - Animation dramatically slowed
+  - Waiting for backend to catch up
+
+This automatic adjustment ensures smooth
+playback even when backend integration
+speed varies.
+
+========================================
+HOW IT WORKS
+========================================
+
+DUAL TIMER ARCHITECTURE:
+
+1. Data Timer (100ms):
+   - Polls backend for new data chunks
+   - Adds data to animation buffer
+   - Runs independently of visualization
+
+2. Animation Timer (16ms ~60 FPS):
+   - Smooth playback from buffer
+   - Interpolates between data points
+   - Updates plot continuously
+
+BUFFER SYSTEM:
+   - Stores data ahead of animation position
+   - Allows smooth playback independent of backend
+   - Auto-adjusts speed when buffer runs low
+   - Prevents animation from catching up to integration
+
+========================================
+TYPICAL WORKFLOW
+========================================
+
+1. Set Parameters:
+   - Adjust simulation parameters in left panel
+   - For quick test: T=1000, dt=10
+
+2. Click "Run Simulation":
+   - Backend starts computing
+   - Animation begins immediately
+   - Plot updates smoothly at 60 FPS
+
+3. Watch Real-time Evolution:
+   - Biomass plot shows smooth growth
+   - Status shows three time scales
+   - Buffer status indicates health
+
+4. Use Playback Controls:
+   - Pause to examine specific moments
+   - Speed up to skip through boring parts
+   - Slow down to see details
+
+5. Adjust View:
+   - Zoom in to see fine structure
+   - Zoom out to see long-term trends
+   - Fit All to see complete history
+
+========================================
+EXAMPLE SCENARIOS
+========================================
+
+SCENARIO 1: Quick Test (Seconds)
+   T: 1000
+   dt: 10
+   - Fast computation
+   - Healthy buffer throughout
+   - Smooth animation at default speed
+
+SCENARIO 2: Long Simulation (Minutes)
+   T: 1e6
+   dt: 1e3
+   - Slower computation
+   - Buffer may go low initially
+   - Speed auto-adjusts
+   - Speed up playback as data accumulates
+
+SCENARIO 3: Detailed Analysis
+   T: 1e6
+   dt: 100
+   - Many data points
+   - Very smooth interpolation
+   - Use zoom to see details
+   - Use pause to examine specific times
+
+========================================
+TECHNICAL DETAILS
+========================================
+
+ANIMATION ALGORITHM:
+   Every frame (~16ms):
+   1. Calculate elapsed real time
+   2. Check buffer status
+   3. Adjust speed factor if needed
+   4. Advance animation time
+   5. Interpolate data at animation_time
+   6. Update plot with single point
+   7. Redraw canvas efficiently
+
+SPEED ADJUSTMENT:
+   buffer_gap = integration_time - animation_time
+
+   if buffer_gap < 100:
+      speed_factor = 0.1  # Critical
+   elif buffer_gap < 1000:
+      speed_factor = proportional  # Low
+   else:
+      speed_factor = 1.0  # Healthy
+
+DATA INTERPOLATION:
+   - Linear interpolation between buffered points
+   - Ensures smooth animation even with sparse data
+   - No visible jumps or discontinuities
+
+========================================
+PERFORMANCE TIPS
+========================================
+
+For Best Performance:
+- Use dt values that give 50-200 epochs
+- Too small dt = too many data points
+- Too large dt = choppy animation
+- Optimal: T/dt between 50-200
+
+For Smooth Animation:
+- Let buffer build up before speeding up
+- Watch buffer status in status bar
+- Don't speed up when buffer is low
+
+For Detailed Visualization:
+- Use smaller dt for more data points
+- Zoom in to see fine structure
+- Pause to examine specific moments
+
+========================================
+TROUBLESHOOTING
+========================================
+
+Animation is Choppy:
+  - Check buffer status
+  - If low, let it build up
+  - Reduce playback speed temporarily
+
+Animation Too Fast:
+  - Reduce speed with slider
+  - Backend is computing very fast
+  - Normal for small T values
+
+Animation Too Slow:
+  - Increase speed with slider
+  - Check buffer status
+  - May auto-slow if buffer low
+
+Plot Not Updating:
+  - Check status bar for errors
+  - Verify simulation is running
+  - Check that dt << T
+
+========================================
+ADVANCED FEATURES
+========================================
+
+BUFFER MANAGEMENT:
+   - Critical threshold: 100 time units
+   - Low threshold: 1000 time units
+   - Configurable in animation_controller.py
+
+WINDOW SIZING:
+   - Dynamic window follows animation
+   - Shows most recent data when zoomed
+   - Complete history stored for scrubbing
+
+FRAME TIMING:
+   - Real wall-clock time tracking
+   - Independent of simulation time
+   - Smooth regardless of backend speed
+
+========================================
+FILES MODIFIED/CREATED
+========================================
+
+New Files:
+   - src/ecoevocrm/gui/animation_controller.py
+   - EcoEvoCRM Simulator.bat
+   - create_desktop_shortcut.py
+   - STREAMING_ANIMATION_GUIDE.txt (this file)
+
+Modified Files:
+   - src/ecoevocrm/gui/main_window.py
+   - src/ecoevocrm/gui/plot_widget.py
+
+========================================
+ENJOY YOUR REAL-TIME SIMULATOR!
+========================================
+
+You now have a professional-grade real-time
+evolutionary dynamics simulator with smooth
+60 FPS animation, playback controls, and
+intelligent buffer management.
+
+Watch evolution unfold in real-time!
+========================================
